@@ -9,7 +9,7 @@ st.set_page_config(page_title="Topologia: Przeciwobraz", layout="wide")
 st.title("Wizualizacja przeciwobrazu funkcji")
 st.markdown("Interaktywne badanie zbioru $f^{-1}(A)$ dla odwzorowania ciągłego $f: \mathbb{R}^2 \\rightarrow \mathbb{R}$.")
 
-# --- GOTOWE PRZYKŁADY (PRESETY) - BEZ EMOJI ---
+# --- GOTOWE PRZYKŁADY (PRESETY) ---
 przykłady = {
     "Własny wzór...": {"f": "sin(x) + cos(y)", "a": -0.5, "b": 0.5, "x": 0.0, "y": 0.0},
     "Okrąg (Zbiór ograniczony)": {"f": "x**2 + y**2", "a": 1.0, "b": 4.0, "x": 0.0, "y": 1.5},
@@ -52,8 +52,6 @@ if a_val > b_val:
 # --- ULTRASZYBKI SILNIK OBLICZENIOWY ---
 safe_dict = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
 f_str_clean = re.sub(r'\^', '**', f_str)
-
-# Konwersja do LaTeX (potęgi i mnożenie)
 f_latex = f_str.replace('**', '^').replace('*', r' \cdot ')
 
 def evaluate_fast(x_input, y_input):
@@ -83,6 +81,7 @@ with col_wynik:
     st.markdown("**Zbiór:**")
     st.latex(rf"A = [{a_val}, {b_val}]")
     
+    st.markdown("---")
     st.markdown("### Obliczenia:")
     st.info(f"Wartość funkcji w punkcie: \n\n$f({x_val}, {y_val}) = {f_point:.4f}$")
     
@@ -95,7 +94,6 @@ with col_wynik:
 
 with col_wykres:
     grid_limit = max(6.0, abs(x_val) * 1.5, abs(y_val) * 1.5)
-    # Zmienione na 501, żeby zlikwidować artefakty przy 0,0
     x_grid = np.linspace(-grid_limit, grid_limit, 501)
     y_grid = np.linspace(-grid_limit, grid_limit, 501)
     X, Y = np.meshgrid(x_grid, y_grid)
@@ -106,31 +104,27 @@ with col_wykres:
 
     fig = go.Figure()
 
-    # --- PERFEKCYJNE RYSOWANIE TOPOLOGICZNE (CONSTRAINT CONTOURS) ---
+    # --- PERFEKCYJNE RYSOWANIE TOPOLOGICZNE ---
     if a_val == b_val:
-        # Rysuje idealną krzywą (poziomicę) bez wypełnienia
         fig.add_trace(go.Contour(
             z=Z, x=x_grid, y=y_grid,
-            contours=dict(
-                type='constraint',
-                operation='=',
-                value=a_val
-            ),
+            contours=dict(type='constraint', operation='=', value=a_val),
             line=dict(color='#2563EB', width=3),
-            showscale=False, hoverinfo='skip'
+            showscale=False,
+            name="Przeciwobraz (krzywa)", 
+            showlegend=True, # Wymuszamy pokazanie w legendzie
+            hoverinfo='skip'
         ))
     else:
-        # Rysuje obszar Z DOKŁADNYMI granicami a i b. Reszta jest pusta (biała).
         fig.add_trace(go.Contour(
             z=Z, x=x_grid, y=y_grid,
-            contours=dict(
-                type='constraint',
-                operation='[]', # '[]' oznacza przedział domknięty [a, b]
-                value=[a_val, b_val]
-            ),
-            fillcolor='rgba(59, 130, 246, 0.5)', # Niebieski kolor tylko dla zbioru
-            line=dict(color='black', width=1.5), # Ostra, czarna krawędź
-            showscale=False, hoverinfo='skip'
+            contours=dict(type='constraint', operation='[]', value=[a_val, b_val]),
+            fillcolor='rgba(59, 130, 246, 0.5)', 
+            line=dict(color='black', width=1.5),
+            showscale=False,
+            name="Przeciwobraz (obszar)", 
+            showlegend=True, # Wymuszamy pokazanie w legendzie
+            hoverinfo='skip'
         ))
 
     # Punkt
@@ -138,16 +132,27 @@ with col_wykres:
         x=[x_val], y=[y_val],
         mode='markers',
         marker=dict(color='#10B981' if is_in_A else '#EF4444', size=14, line=dict(color='black', width=2)),
-        hoverinfo='skip'
+        name="Badany punkt",
+        showlegend=True # Wymuszamy pokazanie w legendzie
     ))
 
+    # --- ZABLOKOWANA LEGENDA I AKADEMICKI WYGLĄD ---
     fig.update_layout(
         height=600,
         margin=dict(l=10, r=10, t=30, b=10),
         xaxis=dict(zeroline=True, zerolinewidth=1, zerolinecolor='gray'),
         yaxis=dict(zeroline=True, zerolinewidth=1, zerolinecolor='gray', scaleanchor="x", scaleratio=1),
         plot_bgcolor='white',
-        showlegend=False
+        showlegend=True,
+        legend=dict(
+            yanchor="top", y=0.98, 
+            xanchor="left", x=0.02,
+            bgcolor="rgba(255, 255, 255, 0.9)",
+            bordercolor="black", # Akademicka ramka
+            borderwidth=1,
+            itemclick=False,       # BLOKADA KLIKANIA
+            itemdoubleclick=False  # BLOKADA PODWÓJNEGO KLIKANIA
+        )
     )
     
     st.plotly_chart(fig, use_container_width=True)
