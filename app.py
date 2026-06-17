@@ -7,39 +7,49 @@ import re
 st.set_page_config(page_title="Topologia: Przeciwobraz", layout="wide")
 
 st.title("Wizualizacja przeciwobrazu funkcji")
-st.markdown("Interaktywne badanie zbioru $f^{-1}(A)$ dla odwzorowania ciągłego $f: \mathbb{R}^2 \to \mathbb{R}$.")
+# Używamy \rightarrow zamiast \to, żeby Streamlit się nie dławił i nie robił "o"
+st.markdown("Interaktywne badanie zbioru $f^{-1}(A)$ dla odwzorowania ciągłego $f: \mathbb{R}^2 \\rightarrow \mathbb{R}$.")
+
+# --- GOTOWE PRZYKŁADY (PRESETY) ---
+przykłady = {
+    "🛠️ Własny wzór...": {"f": "sin(x) + cos(y)", "a": -0.5, "b": 0.5, "x": 0.0, "y": 0.0},
+    "🔵 Okrąg (Zbiór ograniczony)": {"f": "x**2 + y**2", "a": 1.0, "b": 4.0, "x": 0.0, "y": 1.5},
+    "🐎 Siodło (Obszary rozłączne)": {"f": "x**2 - y**2", "a": 1.0, "b": 3.0, "x": 2.0, "y": 0.0},
+    "🌊 Fale (Nieskończenie wiele składowych)": {"f": "sin(x) * cos(y)", "a": 0.5, "b": 1.0, "x": 1.5, "y": 0.0},
+    "✖️ Przecięcie prostych (Zbiór osobliwy)": {"f": "x * y", "a": 0.0, "b": 0.0, "x": 0.0, "y": 3.0}
+}
 
 # --- PANEL BOCZNY: PARAMETRY ---
 with st.sidebar:
     st.header("Parametry przestrzeni")
     
-    f_str = st.text_input("Wzór funkcji f(x, y)", value="sin(x) + cos(y)", 
-                          help="Możesz pisać naturalnie, np. sin(x), x**2, exp(y).")
+    wybrany_przyklad = st.selectbox("Wybierz gotowy przykład:", list(przykłady.keys()))
+    p = przykłady[wybrany_przyklad]
+    
+    f_str = st.text_input("Wzór funkcji f(x, y)", value=p["f"])
     
     st.markdown("---")
-    st.subheader("Zbiór domknięty A")
+    st.subheader("Zbiór domknięty A = [a, b]")
     col_a, col_b = st.columns(2)
     with col_a:
-        a_val = st.number_input("Początek [a]", value=-0.5, step=0.1)
+        a_val = st.number_input("Początek [a]", value=float(p["a"]), step=0.1)
     with col_b:
-        b_val = st.number_input("Koniec [b]", value=0.5, step=0.1)
+        b_val = st.number_input("Koniec [b]", value=float(p["b"]), step=0.1)
         
     st.markdown("---")
     st.subheader("Punkt badany (x, y)")
     col_x, col_y = st.columns(2)
     with col_x:
-        x_val = st.number_input("Współrzędna x", value=0.0, step=0.5)
+        x_val = st.number_input("Współrzędna x", value=float(p["x"]), step=0.5)
     with col_y:
-        y_val = st.number_input("Współrzędna y", value=0.0, step=0.5)
+        y_val = st.number_input("Współrzędna y", value=float(p["y"]), step=0.5)
 
 if a_val > b_val:
-    st.error("Błąd: Zbiór A musi być poprawnym przedziałem (a nie może być większe od b).")
+    st.error("Błąd topologiczny: Przedział A musi być poprawny (wartość 'a' nie może być większa od 'b').")
     st.stop()
 
 # --- ULTRASZYBKI SILNIK OBLICZENIOWY ---
-# Przygotowanie bezpiecznego środowiska NumPy bez konieczności wpisywania "np."
 safe_dict = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
-# Zamiana naturalnego zapisu potęgowania (na wypadek gdyby ktoś wpisał x^2 zamiast x**2)
 f_str_clean = re.sub(r'\^', '**', f_str)
 
 def evaluate_fast(x_input, y_input):
@@ -51,7 +61,6 @@ def evaluate_fast(x_input, y_input):
     except Exception as e:
         return None
 
-# Wyliczenie wartości dla punktu
 f_point = evaluate_fast(x_val, y_val)
 
 if f_point is None:
@@ -72,17 +81,16 @@ with col_wynik:
     st.info(f"Wartość funkcji w punkcie: \n\n$f({x_val}, {y_val}) = {f_point:.4f}$")
     
     if is_in_A:
-        st.success(f"**Wniosek:** Punkt $(x, y)$ **należy** do przeciwobrazu $f^{{-1}}(A)$.")
+        st.success(f"**Wniosek:** Punkt $({x_val}, {y_val})$ **należy** do przeciwobrazu $f^{{-1}}(A)$.")
         st.caption(f"Uzasadnienie: Wartość {f_point:.4f} zawiera się w przedziale domkniętym $[{a_val}, {b_val}]$.")
     else:
-        st.error(f"**Wniosek:** Punkt $(x, y)$ **nie należy** do przeciwobrazu $f^{{-1}}(A)$.")
+        st.error(f"**Wniosek:** Punkt $({x_val}, {y_val})$ **nie należy** do przeciwobrazu $f^{{-1}}(A)$.")
         st.caption(f"Uzasadnienie: Wartość {f_point:.4f} leży poza przedziałem domkniętym $[{a_val}, {b_val}]$.")
 
 with col_wykres:
-    # Zoptymalizowana siatka (szybkie ładowanie, brak zacięć)
-    grid_limit = max(10.0, abs(x_val) * 1.5, abs(y_val) * 1.5)
-    x_grid = np.linspace(-grid_limit, grid_limit, 300)
-    y_grid = np.linspace(-grid_limit, grid_limit, 300)
+    grid_limit = max(6.0, abs(x_val) * 1.5, abs(y_val) * 1.5)
+    x_grid = np.linspace(-grid_limit, grid_limit, 400)
+    y_grid = np.linspace(-grid_limit, grid_limit, 400)
     X, Y = np.meshgrid(x_grid, y_grid)
     
     Z = evaluate_fast(X, Y)
@@ -91,27 +99,26 @@ with col_wykres:
 
     fig = go.Figure()
 
-    # Rysowanie obszaru (zoptymalizowane maskowanie)
+    # Zoptymalizowane i wolne od artefaktów rysowanie (jedna warstwa!)
     if a_val == b_val:
         fig.add_trace(go.Contour(
             z=Z, x=x_grid, y=y_grid,
             contours=dict(start=a_val, end=a_val, size=1),
-            line_width=3, colorscale=[[0, '#2563EB'], [1, '#2563EB']],
+            line_width=3, colorscale=[[0, '#3B82F6'], [1, '#3B82F6']],
             showscale=False, name="Przeciwobraz"
         ))
     else:
-        Z_masked = np.where((Z >= a_val) & (Z <= b_val), 1, np.nan)
-        fig.add_trace(go.Contour(
-            z=Z_masked, x=x_grid, y=y_grid,
-            colorscale=[[0, 'rgba(37, 99, 235, 0.5)'], [1, 'rgba(37, 99, 235, 0.5)']],
-            showscale=False, hoverinfo='skip', contours_coloring='heatmap'
-        ))
-        # Krawędzie
         fig.add_trace(go.Contour(
             z=Z, x=x_grid, y=y_grid,
-            contours=dict(start=a_val, end=b_val, size=b_val-a_val),
-            contours_coloring='lines', line_width=1.5, colorscale=[[0, 'black'], [1, 'black']],
-            showscale=False, hoverinfo='skip'
+            contours=dict(
+                start=a_val, 
+                end=b_val, 
+                size=b_val - a_val, # Gwarantuje wypełnienie całego przedziału
+            ),
+            colorscale=[[0, 'rgba(59, 130, 246, 0.4)'], [1, 'rgba(59, 130, 246, 0.4)']],
+            line=dict(color='black', width=1.5), # Czarne ostre linie brzegowe bez szczelin
+            showscale=False,
+            hoverinfo='skip'
         ))
 
     # Punkt
