@@ -1,112 +1,177 @@
 import streamlit as st
 import numpy as np
-import matplotlib.pyplot as plt
+import sympy as sp
+import plotly.graph_objects as go
 
 # --- KONFIGURACJA STRONY ---
-st.set_page_config(page_title="Topologia: Przeciwobraz", layout="centered")
+st.set_page_config(page_title="Topologia: Przeciwobraz", layout="wide", initial_sidebar_state="expanded")
 
-st.title("Wizualizacja przeciwobrazu funkcji")
+# --- STYLE I UI ---
 st.markdown("""
-Aplikacja bada przeciwobraz $f^{-1}(A)$ dla funkcji $f: \mathbb{R}^2 \\to \mathbb{R}$ oraz zbioru $A \\subseteq \mathbb{R}$.
-""")
+<style>
+    .main-header { font-size: 2.5rem; font-weight: 700; color: #1E3A8A; margin-bottom: 0rem; }
+    .sub-header { font-size: 1.2rem; color: #4B5563; margin-bottom: 2rem; }
+    .math-box { background-color: #F3F4F6; padding: 1rem; border-radius: 8px; border-left: 5px solid #3B82F6; }
+</style>
+""", unsafe_allow_html=True)
 
-with st.expander("Ograniczenia implementacyjne i format zapisu"):
-    st.markdown("""
-    * **Zbiór $A$**: Ograniczony do przedziału domkniętego $[a, b]$.
-    * **Funkcja $f(x,y)$**: Musi być ciągła i zapisana zgodnie ze składnią Pythona/NumPy. 
-      Przykłady: `x**2 + y**2` (okrąg), `np.sin(x) * np.cos(y)`, `x - y`.
-    """)
+st.markdown('<p class="main-header">Topologiczny analizator przeciwobrazów</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Interaktywna wizualizacja zbioru $f^{-1}(A)$ z użyciem SymPy i Plotly.</p>', unsafe_allow_html=True)
 
-# --- INTERFEJS UŻYTKOWNIKA ---
-st.header("Parametry wejściowe")
+# --- INICJALIZACJA ZMIENNYCH SYMBOLICZNYCH ---
+x_sym, y_sym = sp.symbols('x y')
 
-f_str = st.text_input("Wzór jawny funkcji f(x, y)", value="x**2 + y**2")
+# --- PANEL BOCZNY: PARAMETRY ---
+with st.sidebar:
+    st.header("⚙️ Parametry przestrzeni")
+    
+    st.markdown("**1. Odwzorowanie ciągłe**")
+    f_str = st.text_input("Wzór f(x, y)", value="sin(x) + cos(y)", 
+                          help="Używaj naturalnej składni, np. sin(x), exp(y), x**2. Nie dodawaj 'np.'!")
+    
+    st.markdown("---")
+    st.markdown("**2. Zbiór domknięty A**")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        a_val = st.number_input("Początek [a]", value=-0.5, step=0.1)
+    with col_b:
+        b_val = st.number_input("Koniec [b]", value=0.5, step=0.1)
+        
+    st.markdown("---")
+    st.markdown("**3. Punkt testowy**")
+    col_x, col_y = st.columns(2)
+    with col_x:
+        x_val = st.number_input("Współrzędna x", value=0.0, step=0.5)
+    with col_y:
+        y_val = st.number_input("Współrzędna y", value=0.0, step=0.5)
 
-col1, col2 = st.columns(2)
-with col1:
-    st.subheader("Zbiór $A = [a, b]$")
-    a_val = st.number_input("Początek przedziału (a)", value=1.0)
-    b_val = st.number_input("Koniec przedziału (b)", value=4.0)
-with col2:
-    st.subheader("Punkt $(x, y)$")
-    x_val = st.number_input("Współrzędna x", value=1.0)
-    y_val = st.number_input("Współrzędna y", value=1.0)
-
+# Zabezpieczenie przed błędem logicznym w topologii
 if a_val > b_val:
-    st.error("Błąd: Wartość 'a' nie może być większa niż 'b'.")
+    st.error("Błąd topologiczny: Przedział A=[a, b] jest zdegenerowany. Wartość 'a' musi być mniejsza lub równa 'b'.")
     st.stop()
 
-# --- LOGIKA OBLICZENIOWA ---
-# Bezpieczne ewaluowanie funkcji przy użyciu NumPy
-def evaluate_f(x, y, expression):
-    allowed_names = {k: v for k, v in np.__dict__.items() if not k.startswith('_')}
-    allowed_names.update({'x': x, 'y': y})
-    try:
-        # Zabezpieczony eval (bez wbudowanych funkcji systemowych)
-        return eval(expression, {"__builtins__": {}}, allowed_names)
-    except Exception as e:
-        return None
-
-# Ewaluacja dla podanego punktu
-f_point = evaluate_f(x_val, y_val, f_str)
-
-if f_point is None:
-    st.error("Błąd parsowania wzoru funkcji. Sprawdź składnię (np. używaj `**` do potęgowania).")
+# --- PARSOWANIE I EWALUACJA MATEMATYCZNA (SYMPY) ---
+try:
+    # Konwersja stringa na wyrażenie symboliczne (całkowicie bezpieczne)
+    expr = sp.sympify(f_str, evaluate=False)
+    # Konwersja wyrażenia na szybką funkcję NumPy
+    f_num = sp.lambdify((x_sym, y_sym), expr, "numpy")
+    
+    # Wyliczenie wartości w badanym punkcie
+    f_point = float(f_num(x_val, y_val))
+    
+except Exception as e:
+    st.error(f"Nie udało się sparsować wzoru funkcji. Sprawdź poprawność zapisu matematycznego. Szczegóły błędu: {e}")
     st.stop()
 
-# --- WYNIK TWIERDZENIA ---
-st.header("Orzeczenie")
+# --- LOGIKA TWIERDZENIA ---
 is_in_A = a_val <= f_point <= b_val
 
-if is_in_A:
-    st.success(f"Punkt $({x_val}, {y_val})$ **NALEŻY** do przeciwobrazu $f^{{-1}}(A)$.")
-    st.info(f"Uzasadnienie: $f({x_val}, {y_val}) = {f_point:.4f}$, co należy do przedziału $[{a_val}, {b_val}]$.")
-else:
-    st.error(f"Punkt $({x_val}, {y_val})$ **NIE NALEŻY** do przeciwobrazu $f^{{-1}}(A)$.")
-    st.info(f"Uzasadnienie: $f({x_val}, {y_val}) = {f_point:.4f}$, co NIE należy do przedziału $[{a_val}, {b_val}]$.")
+# --- INTERFEJS GŁÓWNY: WYNIKI ---
+col_wynik, col_wykres = st.columns([1, 2])
 
-# --- WIZUALIZACJA ---
-st.header("Rysunek przeciwobrazu $f^{-1}(A)$")
+with col_wynik:
+    st.subheader("Orzeczenie analityczne")
+    
+    # Wyświetlanie sformatowanej matematyki w LaTeX
+    latex_expr = sp.latex(expr)
+    st.latex(r"f(x,y) = " + latex_expr)
+    st.latex(rf"A = [{a_val}, {b_val}]")
+    
+    st.markdown("### Wynik obliczeń:")
+    st.latex(rf"f({x_val}, {y_val}) = {f_point:.4f}")
+    
+    if is_in_A:
+        st.success(f"Prawda! Punkt ({x_val}, {y_val}) należy do przeciwobrazu.")
+        st.markdown(f'<div class="math-box">Ponieważ wartość {f_point:.4f} zawiera się w przedziale [{a_val}, {b_val}], orzekamy że <b>$(x,y) \in f^{{-1}}(A)$</b>. Ze względu na ciągłość odwzorowania $f$, przeciwobraz zbioru domkniętego $A$ jest zbiorem domkniętym.</div>', unsafe_allow_html=True)
+    else:
+        st.error(f"Fałsz! Punkt ({x_val}, {y_val}) leży poza przeciwobrazem.")
+        st.markdown(f'<div class="math-box">Ponieważ wartość {f_point:.4f} nie zawiera się w przedziale [{a_val}, {b_val}], orzekamy że <b>$(x,y) \\notin f^{{-1}}(A)$</b>.</div>', unsafe_allow_html=True)
 
-# Definiowanie siatki z dynamicznym zakresem, by punkt był zawsze widoczny
-limit = max(5.0, abs(x_val) * 1.5, abs(y_val) * 1.5)
-x_grid = np.linspace(-limit, limit, 400)
-y_grid = np.linspace(-limit, limit, 400)
-X, Y = np.meshgrid(x_grid, y_grid)
+# --- GENEROWANIE INTERAKTYWNEGO WYKRESU (PLOTLY) ---
+with col_wykres:
+    st.subheader("Wizualizacja płaszczyzny $\mathbb{R}^2$")
+    
+    # Gęsta siatka dla wyeliminowania artefaktów (600x600 punktów)
+    grid_limit = max(10.0, abs(x_val) * 1.5, abs(y_val) * 1.5)
+    x_grid = np.linspace(-grid_limit, grid_limit, 600)
+    y_grid = np.linspace(-grid_limit, grid_limit, 600)
+    X, Y = np.meshgrid(x_grid, y_grid)
+    
+    # Obliczenie wartości funkcji na siatce (wektoryzacja NumPy)
+    Z = f_num(X, Y)
+    
+    # Zabezpieczenie przed funkcjami stałymi
+    if np.isscalar(Z):
+        Z = np.full_like(X, Z)
 
-try:
-    Z = evaluate_f(X, Y, f_str)
-    if Z is None or np.isscalar(Z):
-        st.error("Funkcja nie zwróciła poprawnej tablicy 2D. Może być to funkcja stała bez 'x' i 'y'.")
-        st.stop()
-
-    fig, ax = plt.subplots(figsize=(8, 8))
+    # Tworzenie wykresu
+    fig = go.Figure()
 
     # Rysowanie przeciwobrazu
     if a_val == b_val:
-        # Przeciwobraz to poziomica
-        contour = ax.contour(X, Y, Z, levels=[a_val], colors=['blue'])
-        ax.clabel(contour, inline=True, fontsize=10)
+        # Przeciwobraz punktu - rysujemy poziomicę
+        fig.add_trace(go.Contour(
+            z=Z, x=x_grid, y=y_grid,
+            contours=dict(start=a_val, end=a_val, size=1),
+            line_width=3,
+            colorscale=[[0, 'blue'], [1, 'blue']],
+            showscale=False,
+            name="Przeciwobraz $f^{-1}(A)$"
+        ))
     else:
-        # Przeciwobraz to obszar między poziomicami
-        ax.contourf(X, Y, Z, levels=[a_val, b_val], colors=['lightblue'], alpha=0.6)
-        ax.contour(X, Y, Z, levels=[a_val, b_val], colors=['blue'], linewidths=1.5)
+        # Przeciwobraz przedziału - maska obszaru
+        # Tworzymy dyskretną maskę binarną
+        mask = np.logical_and(Z >= a_val, Z <= b_val).astype(float)
+        # Zamiana 0 na NaN, aby tło było całkowicie przezroczyste i czyste
+        mask[mask == 0] = np.nan 
+        
+        fig.add_trace(go.Contour(
+            z=mask, x=x_grid, y=y_grid,
+            contours_coloring='heatmap',
+            colorscale=[[0, 'rgba(59, 130, 246, 0.4)'], [1, 'rgba(59, 130, 246, 0.6)']], # Estetyczny niebieski
+            showscale=False,
+            hoverinfo='skip',
+            name="Przeciwobraz $f^{-1}(A)$"
+        ))
+        # Dodanie ostrych krawędzi ograniczających zbiór
+        fig.add_trace(go.Contour(
+            z=Z, x=x_grid, y=y_grid,
+            contours=dict(start=a_val, end=b_val, size=b_val - a_val),
+            contours_coloring='lines',
+            line_width=1.5,
+            colorscale=[[0, 'black'], [1, 'black']],
+            showscale=False,
+            hoverinfo='skip'
+        ))
 
-    # Nanoszenie badanego punktu
-    point_color = 'green' if is_in_A else 'red'
-    ax.plot(x_val, y_val, marker='o', markersize=8, color=point_color, markeredgecolor='black', label=f"Badany punkt ({x_val}, {y_val})")
+    # Nanoszenie punktu testowego
+    marker_color = '#10B981' if is_in_A else '#EF4444' # Zielony jeśli prawda, czerwony jeśli fałsz
+    fig.add_trace(go.Scatter(
+        x=[x_val], y=[y_val],
+        mode='markers+text',
+        marker=dict(color=marker_color, size=12, line=dict(color='white', width=2)),
+        text=[f"P({x_val}, {y_val})"],
+        textposition="top right",
+        textfont=dict(size=14, color='white' if not is_in_A else 'black'), # kontrast
+        name="Badany punkt",
+        hovertemplate=f"X: {x_val}<br>Y: {y_val}<br>Wartość f(x,y): {f_point:.4f}<extra></extra>"
+    ))
 
-    # Ustawienia estetyczne wykresu
-    ax.set_aspect('equal', adjustable='box')
-    ax.set_xlabel('Oś X')
-    ax.set_ylabel('Oś Y')
-    ax.set_title(f"Przeciwobraz zbioru A=[{a_val}, {b_val}] dla f(x,y) = {f_str}")
-    ax.grid(True, linestyle=':', alpha=0.7)
-    ax.axhline(0, color='black', linewidth=0.8)
-    ax.axvline(0, color='black', linewidth=0.8)
-    ax.legend(loc="upper right")
+    # Ustawienia układu i osi
+    fig.update_layout(
+        xaxis_title="Oś X",
+        yaxis_title="Oś Y",
+        xaxis=dict(zeroline=True, zerolinewidth=2, zerolinecolor='black', gridcolor='#E5E7EB'),
+        yaxis=dict(zeroline=True, zerolinewidth=2, zerolinecolor='black', gridcolor='#E5E7EB', scaleanchor="x", scaleratio=1),
+        plot_bgcolor='white',
+        margin=dict(l=20, r=20, t=30, b=20),
+        hovermode="closest",
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(255, 255, 255, 0.8)")
+    )
 
-    st.pyplot(fig)
-
-except Exception as e:
-    st.error(f"Wystąpił błąd podczas generowania wykresu: {e}")
+    # Wyświetlenie interaktywnego wykresu
+    st.plotly_chart(fig, use_container_width=True)
+    
+st.markdown("---")
+st.caption("Aplikacja zaliczeniowa | Silnik renderujący: Plotly | Silnik algebraiczny: SymPy")
