@@ -52,8 +52,6 @@ if a_val > b_val:
 # --- ULTRASZYBKI SILNIK OBLICZENIOWY ---
 safe_dict = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
 f_str_clean = re.sub(r'\^', '**', f_str)
-
-# Konwersja wzoru do ładnego LaTeXa (zmiana ** na ^ oraz * na znak mnożenia)
 f_latex = f_str.replace('**', '^').replace('*', r' \cdot ')
 
 def evaluate_fast(x_input, y_input):
@@ -78,11 +76,8 @@ col_wynik, col_wykres = st.columns([1, 2])
 
 with col_wynik:
     st.subheader("Sprawdzenie przynależności")
-    
-    # Eleganckie wyświetlanie potęg w LaTeX
     st.markdown("**Funkcja:**")
     st.latex(rf"f(x,y) = {f_latex}")
-    
     st.markdown("**Zbiór:**")
     st.latex(rf"A = [{a_val}, {b_val}]")
     
@@ -99,9 +94,7 @@ with col_wynik:
 
 with col_wykres:
     grid_limit = max(6.0, abs(x_val) * 1.5, abs(y_val) * 1.5)
-    
-    # KRYTYCZNE: Nieparzysta liczba punktów (501) gwarantuje, że (0,0) zawsze jest na siatce!
-    # To rozwiązuje problem osobliwości i rozłączonego "krzyża" z bliska.
+    # Siatka 501x501 ratuje matematykę przy osobliwościach (0,0)
     x_grid = np.linspace(-grid_limit, grid_limit, 501)
     y_grid = np.linspace(-grid_limit, grid_limit, 501)
     X, Y = np.meshgrid(x_grid, y_grid)
@@ -112,21 +105,27 @@ with col_wykres:
 
     fig = go.Figure()
 
-    # --- PERFEKCYJNE RYSOWANIE TOPOLOGICZNE ---
+    # --- PERFEKCYJNE RYSOWANIE TOPOLOGICZNE (KOLORY I PRZEDZIAŁY) ---
     if a_val == b_val:
+        # Przypadek punktowy (linia)
         fig.add_trace(go.Contour(
             z=Z, x=x_grid, y=y_grid,
             contours=dict(type='constraint', operation='=', value=a_val),
-            line=dict(color='#3B82F6', width=3), # Nowoczesny niebieski
-            showscale=False, hoverinfo='skip', name="Przeciwobraz"
+            line=dict(color='#2563EB', width=3),
+            showscale=False,
+            name=f"Przeciwobraz f⁻¹({a_val})",
+            hovertemplate="Krzywa przeciwobrazu<extra></extra>"
         ))
     else:
+        # Przypadek przedziału (wypełniony obszar)
         fig.add_trace(go.Contour(
             z=Z, x=x_grid, y=y_grid,
             contours=dict(type='constraint', operation='[]', value=[a_val, b_val]),
-            fillcolor='rgba(59, 130, 246, 0.4)', 
-            line=dict(color='rgba(59, 130, 246, 1.0)', width=2), # Obramówki pod kolor obszaru, a nie czarne bloki
-            showscale=False, hoverinfo='skip', name="Przeciwobraz"
+            fillcolor='rgba(59, 130, 246, 0.3)', # Przezroczyste, estetyczne wypełnienie przedziału
+            line=dict(color='#2563EB', width=2), # Ostre granice
+            showscale=False,
+            name=f"Przeciwobraz f⁻¹([{a_val}, {b_val}])",
+            hovertemplate=f"Obszar przedziału [{a_val}, {b_val}]<extra></extra>"
         ))
 
     # Punkt
@@ -134,25 +133,30 @@ with col_wykres:
         x=[x_val], y=[y_val],
         mode='markers',
         marker=dict(color='#10B981' if is_in_A else '#EF4444', size=14, line=dict(color='white', width=2)),
-        name=f"Punkt ({x_val}, {y_val})"
+        name=f"Punkt P({x_val}, {y_val})",
+        hovertemplate=f"X: {x_val}<br>Y: {y_val}<extra></extra>"
     ))
 
-    # --- BEZ BIAŁYCH TŁÓW I BRZYDKICH OBRAMÓWEK ---
+    # --- ETYKIETY, NAZWY I CZYSTY WYGLĄD ---
     fig.update_layout(
+        title=dict(text="Płaszczyzna $\\mathbb{R}^2$ z naniesionym przeciwobrazem", font=dict(size=16)),
         height=600,
-        margin=dict(l=10, r=10, t=30, b=10),
-        paper_bgcolor='rgba(0,0,0,0)', # Przezroczyste tło całkowite
-        plot_bgcolor='rgba(0,0,0,0)',  # Przezroczyste tło wykresu
+        margin=dict(l=40, r=20, t=50, b=40),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
         xaxis=dict(
-            zeroline=True, zerolinewidth=2, zerolinecolor='rgba(128,128,128,0.5)', 
-            showgrid=True, gridcolor='rgba(128,128,128,0.1)'
+            title="Oś X", 
+            zeroline=True, zerolinewidth=2, zerolinecolor='rgba(128,128,128,0.6)', 
+            showgrid=True, gridcolor='rgba(128,128,128,0.15)'
         ),
         yaxis=dict(
-            zeroline=True, zerolinewidth=2, zerolinecolor='rgba(128,128,128,0.5)', 
-            showgrid=True, gridcolor='rgba(128,128,128,0.1)', 
+            title="Oś Y", 
+            zeroline=True, zerolinewidth=2, zerolinecolor='rgba(128,128,128,0.6)', 
+            showgrid=True, gridcolor='rgba(128,128,128,0.15)', 
             scaleanchor="x", scaleratio=1
         ),
-        showlegend=False
+        showlegend=True,
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(255,255,255,0.8)")
     )
     
     st.plotly_chart(fig, use_container_width=True)
