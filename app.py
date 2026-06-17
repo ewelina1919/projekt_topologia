@@ -13,9 +13,11 @@ st.markdown("Interaktywne badanie zbioru $f^{-1}(A)$ dla odwzorowania ciągłego
 przykłady = {
     "🛠️ Własny wzór...": {"f": "sin(x) + cos(y)", "a": -0.5, "b": 0.5, "x": 0.0, "y": 0.0},
     "🔵 Okrąg (Zbiór ograniczony)": {"f": "x**2 + y**2", "a": 1.0, "b": 4.0, "x": 0.0, "y": 1.5},
+    "🍩 Pierścień (Brak jednospójności)": {"f": "x**2 + y**2", "a": 2.0, "b": 5.0, "x": 0.0, "y": 0.0},
     "🐎 Siodło (Obszary rozłączne)": {"f": "x**2 - y**2", "a": 1.0, "b": 3.0, "x": 2.0, "y": 0.0},
-    "🌊 Fale (Nieskończenie wiele składowych)": {"f": "sin(x) * cos(y)", "a": 0.5, "b": 1.0, "x": 1.5, "y": 0.0},
-    "✖️ Przecięcie prostych (Zbiór osobliwy)": {"f": "x * y", "a": 0.0, "b": 0.0, "x": 0.0, "y": 3.0}
+    "✖️ Przecięcie prostych (Osobliwość)": {"f": "x * y", "a": 0.0, "b": 0.0, "x": 0.0, "y": 3.0},
+    "♾️ Lemniskata (Krzywa nieskończoności)": {"f": "(x**2 + y**2)**2 - 2*(x**2 - y**2)", "a": 0.0, "b": 0.0, "x": 1.0, "y": 0.0},
+    "🌊 Fale (Nieskończenie wiele składowych)": {"f": "sin(x) * cos(y)", "a": 0.5, "b": 1.0, "x": 1.5, "y": 0.0}
 }
 
 # --- PANEL BOCZNY: PARAMETRY ---
@@ -51,6 +53,9 @@ if a_val > b_val:
 safe_dict = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
 f_str_clean = re.sub(r'\^', '**', f_str)
 
+# Konwersja wzoru do ładnego LaTeXa (zmiana ** na ^ oraz * na znak mnożenia)
+f_latex = f_str.replace('**', '^').replace('*', r' \cdot ')
+
 def evaluate_fast(x_input, y_input):
     local_env = safe_dict.copy()
     local_env['x'] = x_input
@@ -73,11 +78,17 @@ col_wynik, col_wykres = st.columns([1, 2])
 
 with col_wynik:
     st.subheader("Sprawdzenie przynależności")
-    st.markdown(f"**Funkcja:** $f(x,y) = {f_str}$")
-    st.markdown(f"**Zbiór:** $A = [{a_val}, {b_val}]$")
     
+    # Eleganckie wyświetlanie potęg w LaTeX
+    st.markdown("**Funkcja:**")
+    st.latex(rf"f(x,y) = {f_latex}")
+    
+    st.markdown("**Zbiór:**")
+    st.latex(rf"A = [{a_val}, {b_val}]")
+    
+    st.markdown("---")
     st.markdown("### Obliczenia:")
-    st.info(f"Wartość funkcji w punkcie: \n\n$f({x_val}, {y_val}) = {f_point:.4f}$")
+    st.info(f"Wartość funkcji w punkcie:\n\n$f({x_val}, {y_val}) = {f_point:.4f}$")
     
     if is_in_A:
         st.success(f"**Wniosek:** Punkt $({x_val}, {y_val})$ **należy** do przeciwobrazu $f^{{-1}}(A)$.")
@@ -88,8 +99,11 @@ with col_wynik:
 
 with col_wykres:
     grid_limit = max(6.0, abs(x_val) * 1.5, abs(y_val) * 1.5)
-    x_grid = np.linspace(-grid_limit, grid_limit, 400)
-    y_grid = np.linspace(-grid_limit, grid_limit, 400)
+    
+    # KRYTYCZNE: Nieparzysta liczba punktów (501) gwarantuje, że (0,0) zawsze jest na siatce!
+    # To rozwiązuje problem osobliwości i rozłączonego "krzyża" z bliska.
+    x_grid = np.linspace(-grid_limit, grid_limit, 501)
+    y_grid = np.linspace(-grid_limit, grid_limit, 501)
     X, Y = np.meshgrid(x_grid, y_grid)
     
     Z = evaluate_fast(X, Y)
@@ -98,30 +112,20 @@ with col_wykres:
 
     fig = go.Figure()
 
-    # --- PERFEKCYJNE RYSOWANIE TOPOLOGICZNE (CONSTRAINT CONTOURS) ---
+    # --- PERFEKCYJNE RYSOWANIE TOPOLOGICZNE ---
     if a_val == b_val:
-        # Rysuje idealną krzywą (poziomicę) bez wypełnienia
         fig.add_trace(go.Contour(
             z=Z, x=x_grid, y=y_grid,
-            contours=dict(
-                type='constraint',
-                operation='=',
-                value=a_val
-            ),
-            line=dict(color='#2563EB', width=3),
+            contours=dict(type='constraint', operation='=', value=a_val),
+            line=dict(color='#3B82F6', width=3), # Nowoczesny niebieski
             showscale=False, hoverinfo='skip', name="Przeciwobraz"
         ))
     else:
-        # Rysuje obszar Z DOKŁADNYMI granicami a i b. Reszta jest pusta (biała).
         fig.add_trace(go.Contour(
             z=Z, x=x_grid, y=y_grid,
-            contours=dict(
-                type='constraint',
-                operation='[]', # '[]' oznacza przedział domknięty [a, b]
-                value=[a_val, b_val]
-            ),
-            fillcolor='rgba(59, 130, 246, 0.5)', # Niebieski kolor tylko dla zbioru
-            line=dict(color='black', width=1.5), # Ostra, czarna krawędź
+            contours=dict(type='constraint', operation='[]', value=[a_val, b_val]),
+            fillcolor='rgba(59, 130, 246, 0.4)', 
+            line=dict(color='rgba(59, 130, 246, 1.0)', width=2), # Obramówki pod kolor obszaru, a nie czarne bloki
             showscale=False, hoverinfo='skip', name="Przeciwobraz"
         ))
 
@@ -129,16 +133,25 @@ with col_wykres:
     fig.add_trace(go.Scatter(
         x=[x_val], y=[y_val],
         mode='markers',
-        marker=dict(color='#10B981' if is_in_A else '#EF4444', size=14, line=dict(color='black', width=2)),
+        marker=dict(color='#10B981' if is_in_A else '#EF4444', size=14, line=dict(color='white', width=2)),
         name=f"Punkt ({x_val}, {y_val})"
     ))
 
+    # --- BEZ BIAŁYCH TŁÓW I BRZYDKICH OBRAMÓWEK ---
     fig.update_layout(
         height=600,
         margin=dict(l=10, r=10, t=30, b=10),
-        xaxis=dict(zeroline=True, zerolinewidth=1, zerolinecolor='gray'),
-        yaxis=dict(zeroline=True, zerolinewidth=1, zerolinecolor='gray', scaleanchor="x", scaleratio=1),
-        plot_bgcolor='white',
+        paper_bgcolor='rgba(0,0,0,0)', # Przezroczyste tło całkowite
+        plot_bgcolor='rgba(0,0,0,0)',  # Przezroczyste tło wykresu
+        xaxis=dict(
+            zeroline=True, zerolinewidth=2, zerolinecolor='rgba(128,128,128,0.5)', 
+            showgrid=True, gridcolor='rgba(128,128,128,0.1)'
+        ),
+        yaxis=dict(
+            zeroline=True, zerolinewidth=2, zerolinecolor='rgba(128,128,128,0.5)', 
+            showgrid=True, gridcolor='rgba(128,128,128,0.1)', 
+            scaleanchor="x", scaleratio=1
+        ),
         showlegend=False
     )
     
