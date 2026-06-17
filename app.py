@@ -11,7 +11,6 @@ st.markdown("Interaktywne badanie zbioru $f^{-1}(A)$ dla odwzorowania ciągłego
 
 # --- GOTOWE PRZYKŁADY (PRESETY) ---
 przykłady = {
-    "Własny wzór...": {"f": "sin(x) + cos(y)", "a": -0.5, "b": 0.5, "x": 0.0, "y": 0.0},
     "Okrąg (Zbiór ograniczony)": {"f": "x**2 + y**2", "a": 1.0, "b": 4.0, "x": 0.0, "y": 1.5},
     "Pierścień (Brak jednospójności)": {"f": "x**2 + y**2", "a": 2.0, "b": 5.0, "x": 0.0, "y": 0.0},
     "Siodło (Obszary rozłączne)": {"f": "x**2 - y**2", "a": 1.0, "b": 3.0, "x": 2.0, "y": 0.0},
@@ -20,30 +19,49 @@ przykłady = {
     "Fale (Nieskończenie wiele składowych)": {"f": "sin(x) * cos(y)", "a": 0.5, "b": 1.0, "x": 1.5, "y": 0.0}
 }
 
+# --- INICJALIZACJA PAMIĘCI (ROZWIĄZUJE PROBLEM BLOKADY WPISYWANIA) ---
+if 'f_str' not in st.session_state:
+    st.session_state.f_str = "x**2 + y**2"
+    st.session_state.a_val = 1.0
+    st.session_state.b_val = 4.0
+    st.session_state.x_val = 0.0
+    st.session_state.y_val = 1.5
+    st.session_state.last_preset = "-- Własny wzór --"
+
 # --- PANEL BOCZNY: PARAMETRY ---
 with st.sidebar:
     st.header("Parametry przestrzeni")
     
-    wybrany_przyklad = st.selectbox("Wybierz gotowy przykład:", list(przykłady.keys()))
-    p = przykłady[wybrany_przyklad]
+    wybrany = st.selectbox("Gotowe przykłady:", ["-- Własny wzór --"] + list(przykłady.keys()))
     
-    f_str = st.text_input("Wzór funkcji f(x, y)", value=p["f"])
+    # Ładuje wartości z presetów tylko w momencie kliknięcia (zmiany w menu)
+    if wybrany != st.session_state.last_preset:
+        st.session_state.last_preset = wybrany
+        if wybrany != "-- Własny wzór --":
+            p = przykłady[wybrany]
+            st.session_state.f_str = p["f"]
+            st.session_state.a_val = float(p["a"])
+            st.session_state.b_val = float(p["b"])
+            st.session_state.x_val = float(p["x"])
+            st.session_state.y_val = float(p["y"])
+
+    f_str = st.text_input("Wzór funkcji f(x, y)", key="f_str")
     
     st.markdown("---")
     st.subheader("Zbiór domknięty A = [a, b]")
     col_a, col_b = st.columns(2)
     with col_a:
-        a_val = st.number_input("Początek [a]", value=float(p["a"]), step=0.1)
+        a_val = st.number_input("Początek [a]", step=0.1, key="a_val")
     with col_b:
-        b_val = st.number_input("Koniec [b]", value=float(p["b"]), step=0.1)
+        b_val = st.number_input("Koniec [b]", step=0.1, key="b_val")
         
     st.markdown("---")
     st.subheader("Punkt badany (x, y)")
     col_x, col_y = st.columns(2)
     with col_x:
-        x_val = st.number_input("Współrzędna x", value=float(p["x"]), step=0.5)
+        x_val = st.number_input("Współrzędna x", step=0.5, key="x_val")
     with col_y:
-        y_val = st.number_input("Współrzędna y", value=float(p["y"]), step=0.5)
+        y_val = st.number_input("Współrzędna y", step=0.5, key="y_val")
 
 if a_val > b_val:
     st.error("Błąd topologiczny: Przedział A musi być poprawny (wartość 'a' nie może być większa od 'b').")
@@ -112,7 +130,7 @@ with col_wykres:
             line=dict(color='#2563EB', width=3),
             showscale=False,
             name="Przeciwobraz (krzywa)", 
-            showlegend=True, # Wymuszamy pokazanie w legendzie
+            showlegend=True,
             hoverinfo='skip'
         ))
     else:
@@ -123,7 +141,7 @@ with col_wykres:
             line=dict(color='black', width=1.5),
             showscale=False,
             name="Przeciwobraz (obszar)", 
-            showlegend=True, # Wymuszamy pokazanie w legendzie
+            showlegend=True,
             hoverinfo='skip'
         ))
 
@@ -133,10 +151,10 @@ with col_wykres:
         mode='markers',
         marker=dict(color='#10B981' if is_in_A else '#EF4444', size=14, line=dict(color='black', width=2)),
         name="Badany punkt",
-        showlegend=True # Wymuszamy pokazanie w legendzie
+        showlegend=True
     ))
 
-    # --- ZABLOKOWANA LEGENDA I AKADEMICKI WYGLĄD ---
+    # --- NAPRAWIONA LEGENDA (CZYTELNY TEKST) ---
     fig.update_layout(
         height=600,
         margin=dict(l=10, r=10, t=30, b=10),
@@ -147,11 +165,12 @@ with col_wykres:
         legend=dict(
             yanchor="top", y=0.98, 
             xanchor="left", x=0.02,
-            bgcolor="rgba(255, 255, 255, 0.9)",
-            bordercolor="black", # Akademicka ramka
+            bgcolor="white",          # Twarde, białe tło
+            bordercolor="black",      # Czarna ramka
             borderwidth=1,
-            itemclick=False,       # BLOKADA KLIKANIA
-            itemdoubleclick=False  # BLOKADA PODWÓJNEGO KLIKANIA
+            font=dict(color="black"), # Twardy czarny tekst (zapobiega zanikaniu w dark mode)
+            itemclick=False,
+            itemdoubleclick=False
         )
     )
     
