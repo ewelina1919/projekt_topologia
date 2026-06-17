@@ -7,7 +7,6 @@ import re
 st.set_page_config(page_title="Topologia: Przeciwobraz", layout="wide")
 
 st.title("Wizualizacja przeciwobrazu funkcji")
-# Używamy \rightarrow zamiast \to, żeby Streamlit się nie dławił i nie robił "o"
 st.markdown("Interaktywne badanie zbioru $f^{-1}(A)$ dla odwzorowania ciągłego $f: \mathbb{R}^2 \\rightarrow \mathbb{R}$.")
 
 # --- GOTOWE PRZYKŁADY (PRESETY) ---
@@ -99,26 +98,31 @@ with col_wykres:
 
     fig = go.Figure()
 
-    # Zoptymalizowane i wolne od artefaktów rysowanie (jedna warstwa!)
+    # --- PERFEKCYJNE RYSOWANIE TOPOLOGICZNE (CONSTRAINT CONTOURS) ---
     if a_val == b_val:
-        fig.add_trace(go.Contour(
-            z=Z, x=x_grid, y=y_grid,
-            contours=dict(start=a_val, end=a_val, size=1),
-            line_width=3, colorscale=[[0, '#3B82F6'], [1, '#3B82F6']],
-            showscale=False, name="Przeciwobraz"
-        ))
-    else:
+        # Rysuje idealną krzywą (poziomicę) bez wypełnienia
         fig.add_trace(go.Contour(
             z=Z, x=x_grid, y=y_grid,
             contours=dict(
-                start=a_val, 
-                end=b_val, 
-                size=b_val - a_val, # Gwarantuje wypełnienie całego przedziału
+                type='constraint',
+                operation='=',
+                value=a_val
             ),
-            colorscale=[[0, 'rgba(59, 130, 246, 0.4)'], [1, 'rgba(59, 130, 246, 0.4)']],
-            line=dict(color='black', width=1.5), # Czarne ostre linie brzegowe bez szczelin
-            showscale=False,
-            hoverinfo='skip'
+            line=dict(color='#2563EB', width=3),
+            showscale=False, hoverinfo='skip', name="Przeciwobraz"
+        ))
+    else:
+        # Rysuje obszar Z DOKŁADNYMI granicami a i b. Reszta jest pusta (biała).
+        fig.add_trace(go.Contour(
+            z=Z, x=x_grid, y=y_grid,
+            contours=dict(
+                type='constraint',
+                operation='[]', # '[]' oznacza przedział domknięty [a, b]
+                value=[a_val, b_val]
+            ),
+            fillcolor='rgba(59, 130, 246, 0.5)', # Niebieski kolor tylko dla zbioru
+            line=dict(color='black', width=1.5), # Ostra, czarna krawędź
+            showscale=False, hoverinfo='skip', name="Przeciwobraz"
         ))
 
     # Punkt
