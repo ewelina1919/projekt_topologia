@@ -9,15 +9,15 @@ st.set_page_config(page_title="Topologia: Przeciwobraz", layout="wide")
 st.title("Wizualizacja przeciwobrazu funkcji")
 st.markdown("Interaktywne badanie zbioru $f^{-1}(A)$ dla odwzorowania ciągłego $f: \mathbb{R}^2 \\rightarrow \mathbb{R}$.")
 
-# --- GOTOWE PRZYKŁADY (PRESETY) ---
+# --- GOTOWE PRZYKŁADY (PRESETY) - BEZ EMOJI ---
 przykłady = {
-    "🛠️ Własny wzór...": {"f": "sin(x) + cos(y)", "a": -0.5, "b": 0.5, "x": 0.0, "y": 0.0},
-    "🔵 Okrąg (Zbiór ograniczony)": {"f": "x**2 + y**2", "a": 1.0, "b": 4.0, "x": 0.0, "y": 1.5},
-    "🍩 Pierścień (Brak jednospójności)": {"f": "x**2 + y**2", "a": 2.0, "b": 5.0, "x": 0.0, "y": 0.0},
-    "🐎 Siodło (Obszary rozłączne)": {"f": "x**2 - y**2", "a": 1.0, "b": 3.0, "x": 2.0, "y": 0.0},
-    "✖️ Przecięcie prostych (Osobliwość)": {"f": "x * y", "a": 0.0, "b": 0.0, "x": 0.0, "y": 3.0},
-    "♾️ Lemniskata (Krzywa nieskończoności)": {"f": "(x**2 + y**2)**2 - 2*(x**2 - y**2)", "a": 0.0, "b": 0.0, "x": 1.0, "y": 0.0},
-    "🌊 Fale (Nieskończenie wiele składowych)": {"f": "sin(x) * cos(y)", "a": 0.5, "b": 1.0, "x": 1.5, "y": 0.0}
+    "Własny wzór...": {"f": "sin(x) + cos(y)", "a": -0.5, "b": 0.5, "x": 0.0, "y": 0.0},
+    "Okrąg (Zbiór ograniczony)": {"f": "x**2 + y**2", "a": 1.0, "b": 4.0, "x": 0.0, "y": 1.5},
+    "Pierścień (Brak jednospójności)": {"f": "x**2 + y**2", "a": 2.0, "b": 5.0, "x": 0.0, "y": 0.0},
+    "Siodło (Obszary rozłączne)": {"f": "x**2 - y**2", "a": 1.0, "b": 3.0, "x": 2.0, "y": 0.0},
+    "Przecięcie prostych (Zbiór osobliwy)": {"f": "x * y", "a": 0.0, "b": 0.0, "x": 0.0, "y": 3.0},
+    "Lemniskata (Krzywa nieskończoności)": {"f": "(x**2 + y**2)**2 - 2*(x**2 - y**2)", "a": 0.0, "b": 0.0, "x": 1.0, "y": 0.0},
+    "Fale (Nieskończenie wiele składowych)": {"f": "sin(x) * cos(y)", "a": 0.5, "b": 1.0, "x": 1.5, "y": 0.0}
 }
 
 # --- PANEL BOCZNY: PARAMETRY ---
@@ -52,6 +52,8 @@ if a_val > b_val:
 # --- ULTRASZYBKI SILNIK OBLICZENIOWY ---
 safe_dict = {k: getattr(np, k) for k in dir(np) if not k.startswith('_')}
 f_str_clean = re.sub(r'\^', '**', f_str)
+
+# Konwersja do LaTeX (potęgi i mnożenie)
 f_latex = f_str.replace('**', '^').replace('*', r' \cdot ')
 
 def evaluate_fast(x_input, y_input):
@@ -81,9 +83,8 @@ with col_wynik:
     st.markdown("**Zbiór:**")
     st.latex(rf"A = [{a_val}, {b_val}]")
     
-    st.markdown("---")
     st.markdown("### Obliczenia:")
-    st.info(f"Wartość funkcji w punkcie:\n\n$f({x_val}, {y_val}) = {f_point:.4f}$")
+    st.info(f"Wartość funkcji w punkcie: \n\n$f({x_val}, {y_val}) = {f_point:.4f}$")
     
     if is_in_A:
         st.success(f"**Wniosek:** Punkt $({x_val}, {y_val})$ **należy** do przeciwobrazu $f^{{-1}}(A)$.")
@@ -94,7 +95,7 @@ with col_wynik:
 
 with col_wykres:
     grid_limit = max(6.0, abs(x_val) * 1.5, abs(y_val) * 1.5)
-    # Siatka 501x501 ratuje matematykę przy osobliwościach (0,0)
+    # Zmienione na 501, żeby zlikwidować artefakty przy 0,0
     x_grid = np.linspace(-grid_limit, grid_limit, 501)
     y_grid = np.linspace(-grid_limit, grid_limit, 501)
     X, Y = np.meshgrid(x_grid, y_grid)
@@ -105,58 +106,48 @@ with col_wykres:
 
     fig = go.Figure()
 
-    # --- PERFEKCYJNE RYSOWANIE TOPOLOGICZNE (KOLORY I PRZEDZIAŁY) ---
+    # --- PERFEKCYJNE RYSOWANIE TOPOLOGICZNE (CONSTRAINT CONTOURS) ---
     if a_val == b_val:
-        # Przypadek punktowy (linia)
+        # Rysuje idealną krzywą (poziomicę) bez wypełnienia
         fig.add_trace(go.Contour(
             z=Z, x=x_grid, y=y_grid,
-            contours=dict(type='constraint', operation='=', value=a_val),
+            contours=dict(
+                type='constraint',
+                operation='=',
+                value=a_val
+            ),
             line=dict(color='#2563EB', width=3),
-            showscale=False,
-            name=f"Przeciwobraz f⁻¹({a_val})",
-            hovertemplate="Krzywa przeciwobrazu<extra></extra>"
+            showscale=False, hoverinfo='skip'
         ))
     else:
-        # Przypadek przedziału (wypełniony obszar)
+        # Rysuje obszar Z DOKŁADNYMI granicami a i b. Reszta jest pusta (biała).
         fig.add_trace(go.Contour(
             z=Z, x=x_grid, y=y_grid,
-            contours=dict(type='constraint', operation='[]', value=[a_val, b_val]),
-            fillcolor='rgba(59, 130, 246, 0.3)', # Przezroczyste, estetyczne wypełnienie przedziału
-            line=dict(color='#2563EB', width=2), # Ostre granice
-            showscale=False,
-            name=f"Przeciwobraz f⁻¹([{a_val}, {b_val}])",
-            hovertemplate=f"Obszar przedziału [{a_val}, {b_val}]<extra></extra>"
+            contours=dict(
+                type='constraint',
+                operation='[]', # '[]' oznacza przedział domknięty [a, b]
+                value=[a_val, b_val]
+            ),
+            fillcolor='rgba(59, 130, 246, 0.5)', # Niebieski kolor tylko dla zbioru
+            line=dict(color='black', width=1.5), # Ostra, czarna krawędź
+            showscale=False, hoverinfo='skip'
         ))
 
     # Punkt
     fig.add_trace(go.Scatter(
         x=[x_val], y=[y_val],
         mode='markers',
-        marker=dict(color='#10B981' if is_in_A else '#EF4444', size=14, line=dict(color='white', width=2)),
-        name=f"Punkt P({x_val}, {y_val})",
-        hovertemplate=f"X: {x_val}<br>Y: {y_val}<extra></extra>"
+        marker=dict(color='#10B981' if is_in_A else '#EF4444', size=14, line=dict(color='black', width=2)),
+        hoverinfo='skip'
     ))
 
-    # --- ETYKIETY, NAZWY I CZYSTY WYGLĄD ---
     fig.update_layout(
-        title=dict(text="Płaszczyzna $\\mathbb{R}^2$ z naniesionym przeciwobrazem", font=dict(size=16)),
         height=600,
-        margin=dict(l=40, r=20, t=50, b=40),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        xaxis=dict(
-            title="Oś X", 
-            zeroline=True, zerolinewidth=2, zerolinecolor='rgba(128,128,128,0.6)', 
-            showgrid=True, gridcolor='rgba(128,128,128,0.15)'
-        ),
-        yaxis=dict(
-            title="Oś Y", 
-            zeroline=True, zerolinewidth=2, zerolinecolor='rgba(128,128,128,0.6)', 
-            showgrid=True, gridcolor='rgba(128,128,128,0.15)', 
-            scaleanchor="x", scaleratio=1
-        ),
-        showlegend=True,
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(255,255,255,0.8)")
+        margin=dict(l=10, r=10, t=30, b=10),
+        xaxis=dict(zeroline=True, zerolinewidth=1, zerolinecolor='gray'),
+        yaxis=dict(zeroline=True, zerolinewidth=1, zerolinecolor='gray', scaleanchor="x", scaleratio=1),
+        plot_bgcolor='white',
+        showlegend=False
     )
     
     st.plotly_chart(fig, use_container_width=True)
