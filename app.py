@@ -1,27 +1,3 @@
-dj eluwina
-djeluwina
-Niewidoczny
-
-WrObeL
- rozpoczął(-ęła) rozmowę, która trwała 23 minuty. — 27.03.2023, 23:51
-WrObeL
- rozpoczął(-ęła) rozmowę, która trwała 33 minuty. — 29.04.2024, 22:56
-WrObeL
- rozpoczął(-ęła) rozmowę, która trwała 24 minuty. — 2.06.2024, 11:35
-dj eluwina — 19:14
-import streamlit as st
-import numpy as np
-import plotly.graph_objects as go
-import re
-
-# --- KONFIGURACJA STRONY ---
-
-message.txt
-7 KB
-﻿
-WrObeL
-wrobel889
- 
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
@@ -199,5 +175,3 @@ with col_wykres:
     )
     
     st.plotly_chart(fig, use_container_width=True)
-message.txt
-7 KB
