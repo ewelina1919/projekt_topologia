@@ -124,8 +124,8 @@ with col_wynik:
  
 with col_wykres:
     grid_limit = max(6.0, abs(x_val) * 1.5, abs(y_val) * 1.5)
-    x_grid = np.linspace(-grid_limit, grid_limit, 501)
-    y_grid = np.linspace(-grid_limit, grid_limit, 501)
+    x_grid = np.linspace(-grid_limit, grid_limit, 301)
+    y_grid = np.linspace(-grid_limit, grid_limit, 301)
     X, Y = np.meshgrid(x_grid, y_grid)
     Z = evaluate_fast(X, Y)
     if np.isscalar(Z):
