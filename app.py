@@ -1,75 +1,118 @@
 import streamlit as st
 import numpy as np
-import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+import sympy as sp
 
 # Konfiguracja strony
-st.set_page_config(page_title="Topologia - Projekt", layout="wide")
+st.set_page_config(page_title="Zadanie 5 - Przeciwobraz", layout="wide")
 
-st.title("Wizualizacja Powierzchni Topologicznych")
-st.markdown("Projekt z Topologii | Matematyka Stosowana")
-
-# --- SEKCJA MATEMATYCZNA (Z PAMIĘCIĄ PODRĘCZNĄ) ---
-# Dekorator @st.cache_data sprawia, że jeśli parametry się nie zmienią, 
-# Streamlit nie przelicza tego od nowa, co eliminuje zacinanie!
-
-@st.cache_data
-def generate_torus(R, r, resolution):
-    u = np.linspace(0, 2 * np.pi, resolution)
-    v = np.linspace(0, 2 * np.pi, resolution)
-    U, V = np.meshgrid(u, v)
-    
-    X = (R + r * np.cos(V)) * np.cos(U)
-    Y = (R + r * np.cos(V)) * np.sin(U)
-    Z = r * np.sin(V)
-    return X, Y, Z
-
-@st.cache_data
-def generate_mobius(radius, width, resolution):
-    u = np.linspace(0, 2 * np.pi, resolution)
-    v = np.linspace(-width/2, width/2, resolution)
-    U, V = np.meshgrid(u, v)
-    
-    X = (radius + V * np.cos(U / 2)) * np.cos(U)
-    Y = (radius + V * np.cos(U / 2)) * np.sin(U)
-    Z = V * np.sin(U / 2)
-    return X, Y, Z
+st.title("Zadanie 5: Przeciwobraz funkcji $f^{-1}(A)$")
+st.markdown("Aplikacja orzeka, czy dany punkt należy do przeciwobrazu oraz wykonuje rysunek z uwzględnieniem topologii przedziału (linie ciągłe dla zbiorów domkniętych, przerywane dla otwartych).")
 
 # --- PANEL BOCZNY (INTERFEJS) ---
-st.sidebar.header("Parametry")
-shape = st.sidebar.selectbox("Wybierz powierzchnię:", ["Torus", "Wstęga Möbiusa"])
+st.sidebar.header("Parametry wejściowe")
 
-# Rozdzielczość: wyższa = gładszy (nieposzarpany) wykres, niższa = szybsze ładowanie
-resolution = st.sidebar.slider("Rozdzielczość siatki (gładkość)", min_value=30, max_value=150, value=80, step=10)
+# 1. Definicja funkcji
+st.sidebar.subheader("1. Jawny wzór funkcji $f(x, y)$")
+func_str = st.sidebar.text_input("Podaj wzór (np. x**2 + y**2, sin(x)*y):", value="x**2 + y**2")
 
-# --- GENEROWANIE DANYCH W ZALEŻNOŚCI OD WYBORU ---
-if shape == "Torus":
-    st.sidebar.subheader("Parametry Torusa")
-    R = st.sidebar.slider("Promień główny (R)", 1.0, 5.0, 3.0, 0.1)
-    r = st.sidebar.slider("Promień rury (r)", 0.1, 2.0, 1.0, 0.1)
-    X, Y, Z = generate_torus(R, r, resolution)
-    colorscale = 'Viridis'
+# 2. Zbiór A
+st.sidebar.subheader("2. Zbiór $A \subseteq \mathbb{R}$")
+a = st.sidebar.number_input("Początek przedziału (a)", value=1.0, step=0.5)
+b = st.sidebar.number_input("Koniec przedziału (b)", value=4.0, step=0.5)
 
-elif shape == "Wstęga Möbiusa":
-    st.sidebar.subheader("Parametry Wstęgi")
-    radius = st.sidebar.slider("Promień główny", 1.0, 5.0, 2.0, 0.1)
-    width = st.sidebar.slider("Szerokość wstęgi", 0.5, 3.0, 1.0, 0.1)
-    X, Y, Z = generate_mobius(radius, width, resolution)
-    colorscale = 'Plasma'
-
-# --- WIZUALIZACJA PLOTLY (SZYBKA I PŁYNNA) ---
-fig = go.Figure(data=[go.Surface(z=Z, x=X, y=Y, colorscale=colorscale)])
-
-fig.update_layout(
-    scene=dict(
-        xaxis=dict(visible=False), # Ukrywamy osie dla lepszego efektu wizualnego
-        yaxis=dict(visible=False),
-        zaxis=dict(visible=False),
-        aspectmode='data' # Zachowuje proporcje matematyczne, żeby torus nie był spłaszczony
-    ),
-    margin=dict(l=0, r=0, b=0, t=0),
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)"
+interval_type = st.sidebar.selectbox(
+    "Typ przedziału:", 
+    options=[
+        "Otwarty (a, b)", 
+        "Domknięty [a, b]", 
+        "Lewostronnie domknięty [a, b)", 
+        "Prawostronnie domknięty (a, b]"
+    ]
 )
 
-# Wyświetlenie wykresu na całą szerokość kontenera
-st.plotly_chart(fig, use_container_width=True)
+# 3. Punkt do sprawdzenia
+st.sidebar.subheader("3. Punkt $(x, y) \in \mathbb{R}^2$")
+p_x = st.sidebar.number_input("Współrzędna x", value=0.0, step=0.1)
+p_y = st.sidebar.number_input("Współrzędna y", value=1.5, step=0.1)
+
+# --- MATEMATYKA I LOGIKA ---
+x, y = sp.symbols('x y')
+try:
+    # Bezpieczne parsowanie funkcji wpisanej przez użytkownika
+    f_expr = sp.sympify(func_str)
+    # Zamiana funkcji symbolicznej na bardzo szybką funkcję numeryczną (eliminuje lagi!)
+    f_lambdified = sp.lambdify((x, y), f_expr, "numpy")
+    
+    # Obliczenie wartości w podanym punkcie
+    val_at_point = f_lambdified(p_x, p_y)
+    
+    # Ustalenie właściwości topologicznych brzegów przedziału
+    left_closed = interval_type in ["Domknięty [a, b]", "Lewostronnie domknięty [a, b)"]
+    right_closed = interval_type in ["Domknięty [a, b]", "Prawostronnie domknięty (a, b]"]
+    
+    # Orzekanie o przynależności do przeciwobrazu
+    in_A_left = (val_at_point >= a) if left_closed else (val_at_point > a)
+    in_A_right = (val_at_point <= b) if right_closed else (val_at_point < b)
+    is_in_preimage = in_A_left and in_A_right
+    
+    # --- WYNIKI ---
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.markdown("### Część 1: Orzeczenie")
+        st.write(f"Obliczona wartość funkcji w punkcie $({p_x}, {p_y})$ wynosi: **{val_at_point:.4f}**")
+        
+        if is_in_preimage:
+            st.success(f"Orzeczenie: Punkt $({p_x}, {p_y})$ **należy** do przeciwobrazu $f^{{-1}}(A)$.")
+        else:
+            st.error(f"Orzeczenie: Punkt $({p_x}, {p_y})$ **nie należy** do przeciwobrazu $f^{{-1}}(A)$.")
+            
+        st.markdown("---")
+        st.markdown("**Legenda wykresu:**")
+        st.markdown("* **Niebieski obszar:** Wnętrze przeciwobrazu")
+        st.markdown("* **Gruba linia ciągła:** Brzeg domknięty (punkt należy)")
+        st.markdown("* **Linia przerywana:** Brzeg otwarty (punkt nie należy)")
+        st.markdown("* **Czerwona gwiazdka:** Badany punkt")
+
+    # --- RYSOWANIE WYKRESU Z ZACHOWANIEM TOPOLOGII ---
+    with col2:
+        st.markdown("### Część 2: Rysunek przeciwobrazu")
+        
+        # Generowanie gęstej siatki (600x600 rozwiązuje problem poszarpanych krawędzi)
+        grid_size = 600
+        x_vals = np.linspace(-5, 5, grid_size)
+        y_vals = np.linspace(-5, 5, grid_size)
+        X, Y = np.meshgrid(x_vals, y_vals)
+        Z = f_lambdified(X, Y)
+        
+        fig, ax = plt.subplots(figsize=(7, 7))
+        
+        # Wypełnienie obszaru przeciwobrazu
+        ax.contourf(X, Y, Z, levels=[a, b], colors=['#a0c4ff'], alpha=0.5)
+        
+        # Rysowanie lewego brzegu (a)
+        if left_closed:
+            ax.contour(X, Y, Z, levels=[a], colors='darkblue', linewidths=3, linestyles='solid')
+        else:
+            ax.contour(X, Y, Z, levels=[a], colors='darkblue', linewidths=2, linestyles='dashed')
+            
+        # Rysowanie prawego brzegu (b)
+        if right_closed:
+            ax.contour(X, Y, Z, levels=[b], colors='darkblue', linewidths=3, linestyles='solid')
+        else:
+            ax.contour(X, Y, Z, levels=[b], colors='darkblue', linewidths=2, linestyles='dashed')
+            
+        # Zaznaczenie punktu
+        ax.plot(p_x, p_y, marker='*', color='red', markersize=15, markeredgecolor='black')
+        
+        ax.set_aspect('equal')
+        ax.set_xlim([-5, 5])
+        ax.set_ylim([-5, 5])
+        ax.grid(True, linestyle=':', alpha=0.6)
+        
+        st.pyplot(fig)
+
+except Exception as e:
+    st.error("Błąd: Upewnij się, że wpisujesz poprawny wzór funkcji (np. składnia Pythona wymaga użycia `**` dla potęgowania).")
+    st.write(f"Szczegóły błędu: {e}")
