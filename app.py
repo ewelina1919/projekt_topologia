@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 import sympy as sp
 
 # Konfiguracja strony
-st.set_page_config(page_title="Zadanie 5 - Przeciwobraz", layout="wide")
+st.set_page_config(page_title="Przeciwobraz funkcji", layout="wide")
 
-st.title("Zadanie 5: Przeciwobraz funkcji $f^{-1}(A)$")
-st.markdown("Aplikacja orzeka, czy dany punkt należy do przeciwobrazu oraz wykonuje rysunek z uwzględnieniem topologii przedziału (linie ciągłe dla zbiorów domkniętych, przerywane dla otwartych).")
+st.title("Przeciwobraz funkcji $f^{-1}(A)$")
+st.markdown("Aplikacja orzeka, czy dany punkt należy do przeciwobrazu oraz wykonuje rysunek.")
 
 # --- PANEL BOCZNY (INTERFEJS) ---
 st.sidebar.header("Parametry wejściowe")
@@ -18,8 +18,12 @@ func_str = st.sidebar.text_input("Podaj wzór (np. x**2 + y**2, sin(x)*y):", val
 
 # 2. Zbiór A
 st.sidebar.subheader("2. Zbiór $A \subseteq \mathbb{R}$")
-a = st.sidebar.number_input("Początek przedziału (a)", value=1.0, step=0.5)
-b = st.sidebar.number_input("Koniec przedziału (b)", value=4.0, step=0.5)
+
+use_minus_inf = st.sidebar.checkbox("Początek w $-\infty$")
+a = st.sidebar.number_input("Początek przedziału (a)", value=1.0, step=0.5, disabled=use_minus_inf)
+
+use_plus_inf = st.sidebar.checkbox("Koniec w $+\infty$")
+b = st.sidebar.number_input("Koniec przedziału (b)", value=4.0, step=0.5, disabled=use_plus_inf)
 
 interval_type = st.sidebar.selectbox(
     "Typ przedziału:", 
@@ -28,7 +32,8 @@ interval_type = st.sidebar.selectbox(
         "Domknięty [a, b]", 
         "Lewostronnie domknięty [a, b)", 
         "Prawostronnie domknięty (a, b]"
-    ]
+    ],
+    help="Uwaga: Zaznaczenie nieskończoności matematycznie wymusza nawias otwarty po danej stronie, ignorując ten wybór."
 )
 
 # 3. Punkt do sprawdzenia
@@ -39,21 +44,18 @@ p_y = st.sidebar.number_input("Współrzędna y", value=1.5, step=0.1)
 # --- MATEMATYKA I LOGIKA ---
 x, y = sp.symbols('x y')
 try:
-    # Bezpieczne parsowanie funkcji wpisanej przez użytkownika
     f_expr = sp.sympify(func_str)
-    # Zamiana funkcji symbolicznej na bardzo szybką funkcję numeryczną (eliminuje lagi!)
     f_lambdified = sp.lambdify((x, y), f_expr, "numpy")
     
-    # Obliczenie wartości w podanym punkcie
     val_at_point = f_lambdified(p_x, p_y)
     
-    # Ustalenie właściwości topologicznych brzegów przedziału
-    left_closed = interval_type in ["Domknięty [a, b]", "Lewostronnie domknięty [a, b)"]
-    right_closed = interval_type in ["Domknięty [a, b]", "Prawostronnie domknięty (a, b]"]
+    # Jeśli strona to nieskończoność, ignorujemy wybór i wymuszamy otwartość matematyczną (False)
+    left_closed = False if use_minus_inf else (interval_type in ["Domknięty [a, b]", "Lewostronnie domknięty [a, b)"])
+    right_closed = False if use_plus_inf else (interval_type in ["Domknięty [a, b]", "Prawostronnie domknięty (a, b]"])
     
-    # Orzekanie o przynależności do przeciwobrazu
-    in_A_left = (val_at_point >= a) if left_closed else (val_at_point > a)
-    in_A_right = (val_at_point <= b) if right_closed else (val_at_point < b)
+    # Logika przynależności
+    in_A_left = True if use_minus_inf else ((val_at_point >= a) if left_closed else (val_at_point > a))
+    in_A_right = True if use_plus_inf else ((val_at_point <= b) if right_closed else (val_at_point < b))
     is_in_preimage = in_A_left and in_A_right
     
     # --- WYNIKI ---
@@ -62,6 +64,14 @@ try:
     with col1:
         st.markdown("### Część 1: Orzeczenie")
         st.write(f"Obliczona wartość funkcji w punkcie $({p_x}, {p_y})$ wynosi: **{val_at_point:.4f}**")
+        
+        # Zbudowanie matematycznego zapisu przedziału
+        str_a = "$-\\infty$" if use_minus_inf else str(a)
+        str_b = "$\\infty$" if use_plus_inf else str(b)
+        str_bracket_L = "(" if (use_minus_inf or not left_closed) else "["
+        str_bracket_R = ")" if (use_plus_inf or not right_closed) else "]"
+        
+        st.write(f"Badany przedział to $A = {str_bracket_L}{str_a}, {str_b}{str_bracket_R}$")
         
         if is_in_preimage:
             st.success(f"Orzeczenie: Punkt $({p_x}, {p_y})$ **należy** do przeciwobrazu $f^{{-1}}(A)$.")
@@ -79,7 +89,6 @@ try:
     with col2:
         st.markdown("### Część 2: Rysunek przeciwobrazu")
         
-        # Generowanie gęstej siatki (600x600 rozwiązuje problem poszarpanych krawędzi)
         grid_size = 600
         x_vals = np.linspace(-5, 5, grid_size)
         y_vals = np.linspace(-5, 5, grid_size)
@@ -88,20 +97,26 @@ try:
         
         fig, ax = plt.subplots(figsize=(7, 7))
         
-        # Wypełnienie obszaru przeciwobrazu
-        ax.contourf(X, Y, Z, levels=[a, b], colors=['#a0c4ff'], alpha=0.5)
+        # Ekstremalne wartości Z dla bezpiecznego kolorowania obszaru z nieskończonością
+        Z_min, Z_max = np.min(Z), np.max(Z)
+        plot_a = Z_min - 1.0 if use_minus_inf else a
+        plot_b = Z_max + 1.0 if use_plus_inf else b
         
-        # Rysowanie lewego brzegu (a)
-        if left_closed:
-            ax.contour(X, Y, Z, levels=[a], colors='darkblue', linewidths=3, linestyles='solid')
-        else:
-            ax.contour(X, Y, Z, levels=[a], colors='darkblue', linewidths=2, linestyles='dashed')
+        # Rysowanie tła (obszaru) tylko jeśli przedział ma sens logiczny
+        if plot_a < plot_b:
+            ax.contourf(X, Y, Z, levels=[plot_a, plot_b], colors=['#a0c4ff'], alpha=0.5)
+        
+        # Rysowanie lewego brzegu (tylko jeśli to nie -nieskończoność i mieści się w widoku)
+        if not use_minus_inf and (Z_min <= a <= Z_max):
+            linestyle = 'solid' if left_closed else 'dashed'
+            linewidth = 3 if left_closed else 2
+            ax.contour(X, Y, Z, levels=[a], colors='darkblue', linewidths=linewidth, linestyles=linestyle)
             
-        # Rysowanie prawego brzegu (b)
-        if right_closed:
-            ax.contour(X, Y, Z, levels=[b], colors='darkblue', linewidths=3, linestyles='solid')
-        else:
-            ax.contour(X, Y, Z, levels=[b], colors='darkblue', linewidths=2, linestyles='dashed')
+        # Rysowanie prawego brzegu (tylko jeśli to nie +nieskończoność i mieści się w widoku)
+        if not use_plus_inf and (Z_min <= b <= Z_max):
+            linestyle = 'solid' if right_closed else 'dashed'
+            linewidth = 3 if right_closed else 2
+            ax.contour(X, Y, Z, levels=[b], colors='darkblue', linewidths=linewidth, linestyles=linestyle)
             
         # Zaznaczenie punktu
         ax.plot(p_x, p_y, marker='*', color='red', markersize=15, markeredgecolor='black')
@@ -114,5 +129,5 @@ try:
         st.pyplot(fig)
 
 except Exception as e:
-    st.error("Błąd: Upewnij się, że wpisujesz poprawny wzór funkcji (np. składnia Pythona wymaga użycia `**` dla potęgowania).")
+    st.error("Błąd: Upewnij się, że wpisujesz poprawny wzór funkcji.")
     st.write(f"Szczegóły błędu: {e}")
