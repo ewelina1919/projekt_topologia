@@ -81,8 +81,8 @@ try:
         st.markdown("---")
         st.markdown("**Legenda wykresu:**")
         st.markdown("* **Niebieski obszar:** Wnętrze przeciwobrazu")
-        st.markdown("* **Gruba linia ciągła:** Brzeg domknięty (punkt należy)")
-        st.markdown("* **Linia przerywana:** Brzeg otwarty (punkt nie należy)")
+        st.markdown("* **Gruba linia ciągła:** Brzeg domknięty")
+        st.markdown("* **Linia przerywana:** Brzeg otwarty")
         st.markdown("* **Czerwona gwiazdka:** Badany punkt")
 
     # --- RYSOWANIE WYKRESU Z ZACHOWANIEM TOPOLOGII ---
